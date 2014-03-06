@@ -1,0 +1,8 @@
+{
+  "name": "udpclient",
+  "version": "0.0.1",
+  "private": false,
+  "dependencies": {
+    "pomelo-protocol": "0.1.3"
+  }
+}
