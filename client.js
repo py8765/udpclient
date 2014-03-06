@@ -3,13 +3,15 @@ var client = dgram.createSocket("udp4");
 var protocol = require('pomelo-protocol');
 var Package = protocol.Package;
 var Message = protocol.Message;
-var heartbeatInterval = 3000;
-var heartbeatTimeout = 6000;
+var reqId = 0;
 var nextHeartbeatTimeout = 0;
 var gapThreshold = 100;
+var heartbeatInterval = 3000;
+var heartbeatTimeout = 6000;
 var heartbeatTimeoutId = null;
 var handshakeCallback = null;
 var heartbeatId = null;
+var callbacks = {};
 
 var host = 'localhost';
 var port = 3010;
@@ -28,6 +30,12 @@ var heartbeatData = Package.encode(Package.TYPE_HEARTBEAT);
 var handshakeAckData = Package.encode(Package.TYPE_HANDSHAKE_ACK);
 var handshakeData = Package.encode(Package.TYPE_HANDSHAKE, protocol.strencode(JSON.stringify(handshakeBuffer)));
 
+var init = function(ip, pt, cb) {
+  host = ip;
+  port = pt;
+  sendHandshake(cb);
+};
+
 var send = function(data, cb) {
   client.send(data, 0, data.length, port, host, function(err, bytes) {
     if(!!err) {
@@ -39,11 +47,10 @@ var send = function(data, cb) {
   });
 };
 
-var sendHandshake = function() {
+var sendHandshake = function(cb) {
   send(handshakeData);
+  handshakeCallback = cb;
 };
-
-sendHandshake();
 
 var decode = function(data) {
   var msg = Message.decode(data);
@@ -53,7 +60,14 @@ var decode = function(data) {
 
 var onData = function(data) {
   var msg = decode(data);
-  console.log('receive message from server: %j', msg);
+  processMessage(msg);
+};
+
+var processMessage = function(msg) {
+  var cb = callbacks[msg.id];
+  delete callbacks[msg.id];
+  cb(msg.body);
+  return;
 };
 
 var onKick = function(data) {
@@ -71,13 +85,17 @@ var sendMessage = function(reqId, route, msg) {
 var handshake = function(data) {
   data = JSON.parse(protocol.strdecode(data));
   console.log('receive handshake data: %j', data);
-  send(handshakeAckData, function() {
-    sendMessage(1, 'connector.entryHandler.entry', {test: 555, route:'connector.entryHandler.entry'});
-  });
+  send(handshakeAckData, handshakeCallback);
+};
+
+var request = function(route, message, cb) {
+  reqId++;
+  callbacks[reqId] = cb;
+  sendMessage(reqId, route, message);
 };
 
 var heartbeat = function(data) {
-  console.log('receive heartbeat!');
+  console.log('receive heartbeat');
   if(!heartbeatInterval) {
     return;
   }
@@ -85,13 +103,12 @@ var heartbeat = function(data) {
     clearTimeout(heartbeatTimeoutId);
     heartbeatTimeoutId = null;
   }
-
   if(heartbeatId) {
     return;
   }
   heartbeatId = setTimeout(function() {
     heartbeatId = null;
-    console.log('send heartbeat message!!!');
+    console.log('send heartbeat message');
     send(heartbeatData);
     nextHeartbeatTimeout = Date.now() + heartbeatTimeout;
     heartbeatTimeoutId = setTimeout(heartbeatTimeoutCb, heartbeatTimeout);
@@ -126,4 +143,10 @@ handlers[Package.TYPE_KICK] = onKick;
 
 client.on("message", function (msg, rinfo) {
   processPackage(Package.decode(msg));
+});
+
+init('localhost', 3010, function() {
+  request('connector.entryHandler.entry', {test: 555, route:'connector.entryHandler.entry'}, function(data) {
+    console.log('receive data: %j', data);
+  });
 });
