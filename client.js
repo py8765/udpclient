@@ -64,6 +64,10 @@ var onData = function(data) {
 };
 
 var processMessage = function(msg) {
+  if(!msg.id) {
+    client.emit(msg.route, msg.body);
+    return;
+  }
   var cb = callbacks[msg.id];
   delete callbacks[msg.id];
   cb(msg.body);
@@ -146,7 +150,22 @@ client.on("message", function (msg, rinfo) {
 });
 
 init('localhost', 3010, function() {
-  request('connector.entryHandler.entry', {test: 555, route:'connector.entryHandler.entry'}, function(data) {
-    console.log('receive data: %j', data);
+  request('connector.entryHandler.entry', {username:'py', rid:'1', route:'connector.entryHandler.entry'}, function(data) {
+    console.log('receive enter callback data: %j', data);
+    request('chat.chatHandler.send', {content: 'hello world', target: '*', route: 'onChat'}, function(data) {
+      console.log('receive send callback data: %j', data);
+    });
+  });
+
+  client.on('onAdd', function(msg) {
+    console.log('onAdd receive message: %j', msg);
+  });
+
+  client.on('onLeave', function(msg) {
+    console.log('onLeave receive message: %j', msg);
+  });
+
+  client.on('onChat', function(msg) {
+    console.log('onChat receive message: %j', msg);
   });
 });
