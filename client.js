@@ -152,9 +152,11 @@ client.on("message", function (msg, rinfo) {
 init('localhost', 3010, function() {
   request('connector.entryHandler.entry', {username:'py', rid:'1', route:'connector.entryHandler.entry'}, function(data) {
     console.log('receive enter callback data: %j', data);
+    /**
     request('chat.chatHandler.send', {content: 'hello world', target: '*', route: 'onChat'}, function(data) {
       console.log('receive send callback data: %j', data);
     });
+    */
   });
 
   client.on('onAdd', function(msg) {
